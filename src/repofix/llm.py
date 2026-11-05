@@ -8,6 +8,7 @@ import urllib.parse
 import urllib.request
 
 from .models import ProjectProfile
+from .patching import normalize_patch_paths
 
 
 class LLMError(RuntimeError):
@@ -42,6 +43,8 @@ Relevant repository files:
 Create the smallest correct fix and add or update a regression test when appropriate.
 Preserve existing architecture and conventions. Avoid unrelated refactoring.
 Return only a valid git unified diff, with no Markdown fence or explanation.
+Every old-file header must start with `--- a/` and every new-file header with `+++ b/`.
+Use `/dev/null` only when creating or deleting a file. Never use absolute paths.
 """
     if provider == "gemini":
         api_key = os.getenv("GEMINI_API_KEY")
@@ -90,7 +93,7 @@ Return only a valid git unified diff, with no Markdown fence or explanation.
     )
     if not text:
         raise LLMError("The LLM response did not contain text output.")
-    return _strip_fence(text)
+    return normalize_patch_paths(_strip_fence(text))
 
 
 def _send_request(request: urllib.request.Request, provider_name: str = "OpenAI") -> dict:

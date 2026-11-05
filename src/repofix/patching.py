@@ -8,6 +8,34 @@ class PatchError(RuntimeError):
     pass
 
 
+def normalize_patch_paths(patch: str) -> str:
+    """Add Git's a/ and b/ prefixes to safe repository-relative diff headers."""
+    normalized: list[str] = []
+    for line in patch.splitlines(keepends=True):
+        prefix = next((marker for marker in ("--- ", "+++ ") if line.startswith(marker)), None)
+        if prefix is None:
+            normalized.append(line)
+            continue
+        ending = "\n" if line.endswith("\n") else ""
+        header = line[len(prefix):].removesuffix("\n")
+        value, separator, metadata = header.partition("\t")
+        stripped = value.strip()
+        path = PurePosixPath(stripped)
+        if (
+            stripped != "/dev/null"
+            and not stripped.startswith('"')
+            and "\\" not in stripped
+            and not path.is_absolute()
+            and path.parts
+            and path.parts[0] not in {"a", "b"}
+            and not any(part in {"", ".", ".."} for part in path.parts)
+        ):
+            side = "a" if prefix == "--- " else "b"
+            value = f"{side}/{stripped}"
+        normalized.append(f"{prefix}{value}{separator}{metadata}{ending}")
+    return "".join(normalized)
+
+
 def validate_patch_text(patch: str) -> None:
     if not patch.strip():
         raise PatchError("The generated patch is empty.")

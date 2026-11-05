@@ -1,6 +1,6 @@
 import pytest
 
-from repofix.patching import PatchError, validate_patch_text
+from repofix.patching import PatchError, normalize_patch_paths, validate_patch_text
 
 
 def test_rejects_non_diff() -> None:
@@ -10,6 +10,22 @@ def test_rejects_non_diff() -> None:
 
 def test_accepts_unified_diff() -> None:
     validate_patch_text("--- a/app.py\n+++ b/app.py\n@@ -1 +1 @@\n-old\n+new\n")
+
+
+def test_normalizes_safe_repository_relative_headers() -> None:
+    patch = "--- src/app.py\n+++ src/app.py\n@@ -1 +1 @@\n-old\n+new\n"
+
+    normalized = normalize_patch_paths(patch)
+
+    assert normalized.startswith("--- a/src/app.py\n+++ b/src/app.py\n")
+    validate_patch_text(normalized)
+
+
+def test_normalization_does_not_hide_unsafe_parent_paths() -> None:
+    patch = "--- ../secret\n+++ ../secret\n@@ -1 +1 @@\n-old\n+new\n"
+
+    with pytest.raises(PatchError):
+        validate_patch_text(normalize_patch_paths(patch))
 
 
 def test_rejects_parent_path() -> None:
