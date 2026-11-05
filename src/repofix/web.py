@@ -30,6 +30,30 @@ def _analysis_only() -> bool:
     return os.getenv("REPOFIX_ANALYSIS_ONLY", "0").strip().lower() in {"1", "true", "yes"}
 
 
+def _ai_enabled() -> bool:
+    provider = os.getenv("REPOFIX_AI_PROVIDER", "openai").strip().lower()
+    key_name = "GEMINI_API_KEY" if provider == "gemini" else "OPENAI_API_KEY"
+    return provider in {"openai", "gemini"} and bool(os.getenv(key_name, "").strip())
+
+
+def _default_model() -> str:
+    configured = os.getenv("REPOFIX_MODEL", "").strip()
+    if configured:
+        return configured
+    if os.getenv("REPOFIX_AI_PROVIDER", "openai").strip().lower() == "gemini":
+        return "gemini-3.8-flash"
+    return "gpt-6.1-terra"
+
+
+def _allowed_modes() -> set[str]:
+    modes = {"analyze"}
+    if not _analysis_only() and _ai_enabled():
+        modes.add("generate")
+    if os.getenv("REPOFIX_ALLOW_REPAIR", "0").strip().lower() in {"1", "true", "yes"}:
+        modes.add("repair")
+    return modes
+
+
 def create_app(database: str | Path = Path("repofix.db"), enqueue=enqueue_analysis):
     try:
         from fastapi import FastAPI, Header, HTTPException, Request
@@ -113,12 +137,10 @@ def create_app(database: str | Path = Path("repofix.db"), enqueue=enqueue_analys
             raise HTTPException(status_code=422, detail=quality_error)
         if len(issue) > 8_000:
             raise HTTPException(status_code=422, detail="issue must not exceed 8,000 characters")
-        if mode not in {"analyze", "generate", "repair"}:
-            raise HTTPException(status_code=422, detail="mode must be analyze, generate, or repair")
-        if _analysis_only() and mode != "analyze":
+        if mode not in _allowed_modes():
             raise HTTPException(
                 status_code=422,
-                detail="This deployment supports repository analysis only",
+                detail="The requested workflow is not enabled in this deployment",
             )
         allow_local = os.getenv("REPOFIX_ALLOW_LOCAL_WEB") == "1"
         if not allow_local:
@@ -129,7 +151,7 @@ def create_app(database: str | Path = Path("repofix.db"), enqueue=enqueue_analys
         job = store.create(repository, issue, "queued", current_identity()["uid"])
         try:
             workspace = Path(os.getenv("REPOFIX_WORKSPACE", ".repofix-work")).resolve()
-            model = os.getenv("REPOFIX_MODEL", "gpt-6.1-terra")
+            model = _default_model()
             runner = os.getenv("REPOFIX_WEB_RUNNER", "docker")
             try:
                 attempts = max(1, min(5, int(os.getenv("REPOFIX_ATTEMPTS", "3"))))
@@ -164,17 +186,17 @@ def create_app(database: str | Path = Path("repofix.db"), enqueue=enqueue_analys
         if source.status not in {"failed", "cancelled", "completed"}:
             raise HTTPException(status_code=409, detail="Only finished analyses can be retried")
         mode = str(source.result.get("mode", "analyze"))
-        if _analysis_only() and mode != "analyze":
+        if mode not in _allowed_modes():
             raise HTTPException(
                 status_code=422,
-                detail="This deployment supports repository analysis only",
+                detail="The requested workflow is not enabled in this deployment",
             )
         retried = store.create(
             source.repository, source.issue, "queued", current_identity()["uid"]
         )
         try:
             workspace = Path(os.getenv("REPOFIX_WORKSPACE", ".repofix-work")).resolve()
-            model = os.getenv("REPOFIX_MODEL", "gpt-6.1-terra")
+            model = _default_model()
             runner = os.getenv("REPOFIX_WEB_RUNNER", "docker")
             attempts = max(1, min(5, int(os.getenv("REPOFIX_ATTEMPTS", "3"))))
             queue_id = enqueue(
@@ -298,7 +320,16 @@ def create_app(database: str | Path = Path("repofix.db"), enqueue=enqueue_analys
 
     @app.get("/api/health")
     def health():
-        return {"service": "ok", "queue": queue_health()}
+        modes = _allowed_modes()
+        return {
+            "service": "ok",
+            "queue": queue_health(),
+            "capabilities": {
+                "analyze": True,
+                "generate": "generate" in modes,
+                "repair": "repair" in modes,
+            },
+        }
 
     @app.get("/{page:path}", response_class=HTMLResponse)
     def app_page(page: str):

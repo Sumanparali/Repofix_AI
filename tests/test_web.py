@@ -140,7 +140,10 @@ def test_local_queue_preserves_analysis_workflow(monkeypatch, tmp_path) -> None:
     assert submitted[0][1][5] == "repair"
 
 
-def test_web_job_forwards_requested_workflow(tmp_path: Path) -> None:
+def test_web_job_forwards_requested_workflow(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("REPOFIX_ANALYSIS_ONLY", "0")
+    monkeypatch.setenv("REPOFIX_AI_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     submitted = []
     app = create_app(tmp_path / "jobs.db", enqueue=lambda *args: submitted.append(args) or "queued")
     route = next(
@@ -181,7 +184,17 @@ def test_analysis_only_deployment_rejects_ai_workflows(monkeypatch, tmp_path: Pa
         )
 
     assert error.value.status_code == 422
-    assert "analysis only" in error.value.detail
+    assert "not enabled" in error.value.detail
+
+
+def test_health_exposes_gemini_generation_capability(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("REPOFIX_ANALYSIS_ONLY", "0")
+    monkeypatch.setenv("REPOFIX_AI_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    app = create_app(tmp_path / "jobs.db", enqueue=lambda *args: "queued")
+    route = next(route for route in app.routes if getattr(route, "path", None) == "/api/health")
+    health = route.endpoint()
+    assert health["capabilities"] == {"analyze": True, "generate": True, "repair": False}
 
 
 def test_web_job_rejects_random_issue_text(tmp_path: Path) -> None:
@@ -270,7 +283,10 @@ def test_pdf_report_is_downloadable(tmp_path: Path) -> None:
     assert response.headers["content-disposition"].endswith('repofix-1-report.pdf"')
 
 
-def test_failed_analysis_can_be_retried(tmp_path: Path) -> None:
+def test_failed_analysis_can_be_retried(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("REPOFIX_ANALYSIS_ONLY", "0")
+    monkeypatch.setenv("REPOFIX_AI_PROVIDER", "openai")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     database = tmp_path / "jobs.db"
     store = JobStore(database)
     failed = store.create("https://github.com/openai/example.git", "fix value")

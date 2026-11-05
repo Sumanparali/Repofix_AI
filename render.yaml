@@ -23,7 +23,15 @@ services:
       - key: REPOFIX_QUEUE_MODE
         value: local
       - key: REPOFIX_ANALYSIS_ONLY
-        value: "1"
+        value: "0"
+      - key: REPOFIX_AI_PROVIDER
+        value: gemini
+      - key: REPOFIX_MODEL
+        value: gemini-3.8-flash
+      - key: REPOFIX_ALLOW_REPAIR
+        value: "0"
+      - key: GEMINI_API_KEY
+        sync: false
       - key: REPOFIX_AUTH_MODE
         value: firebase
       - key: REPOFIX_WORKSPACE

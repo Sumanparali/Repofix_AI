@@ -4,6 +4,7 @@ import json
 import os
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from .models import ProjectProfile
@@ -20,11 +21,9 @@ def generate_patch(
     model: str,
     failure_feedback: str | None = None,
 ) -> str:
-    api_key = os.getenv("OPENAI_API_KEY")
-    endpoint = "https://api.openai.com/v1/responses"
-    provider_name = "OpenAI"
-    if not api_key:
-        raise LLMError("OPENAI_API_KEY is not set. Add it to .env and restart RepoFix.")
+    provider = os.getenv("REPOFIX_AI_PROVIDER", "openai").strip().lower()
+    if provider not in {"openai", "gemini"}:
+        raise LLMError("REPOFIX_AI_PROVIDER must be either openai or gemini.")
 
     feedback = ""
     if failure_feedback:
@@ -44,19 +43,51 @@ Create the smallest correct fix and add or update a regression test when appropr
 Preserve existing architecture and conventions. Avoid unrelated refactoring.
 Return only a valid git unified diff, with no Markdown fence or explanation.
 """
-    body = json.dumps({"model": model, "input": prompt}).encode("utf-8")
+    if provider == "gemini":
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise LLMError("GEMINI_API_KEY is not set. Add it to .env and restart RepoFix.")
+        safe_model = urllib.parse.quote(model, safe="-._")
+        endpoint = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"{safe_model}:generateContent"
+        )
+        provider_name = "Gemini"
+        request_body = {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {"temperature": 0.1},
+        }
+        headers = {
+            "x-goog-api-key": api_key,
+            "Content-Type": "application/json",
+            "User-Agent": "RepoFix-AI/0.1",
+        }
+    else:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise LLMError("OPENAI_API_KEY is not set. Add it to .env and restart RepoFix.")
+        endpoint = "https://api.openai.com/v1/responses"
+        provider_name = "OpenAI"
+        request_body = {"model": model, "input": prompt}
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "RepoFix-AI/0.1",
+        }
+
+    body = json.dumps(request_body).encode("utf-8")
     request = urllib.request.Request(
         endpoint,
         data=body,
         method="POST",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "User-Agent": "RepoFix-AI/0.1",
-        },
+        headers=headers,
     )
     payload = _send_request(request, provider_name)
-    text = payload.get("output_text") or _extract_output_text(payload)
+    text = (
+        _extract_gemini_text(payload)
+        if provider == "gemini"
+        else payload.get("output_text") or _extract_output_text(payload)
+    )
     if not text:
         raise LLMError("The LLM response did not contain text output.")
     return _strip_fence(text)
@@ -75,13 +106,13 @@ def _send_request(request: urllib.request.Request, provider_name: str = "OpenAI"
                 time.sleep(2 ** (attempt + 1))
                 continue
             if exc.code == 429 and code == "insufficient_quota":
-                action = (
-                    "Check your Groq free-tier limits at console.groq.com/settings/limits, "
-                    "then retry after the quota resets."
-                    if provider_name == "Groq"
-                    else "Add API billing credits at platform.openai.com/settings/organization/billing, "
-                    "then retry the analysis."
-                )
+                if provider_name == "Gemini":
+                    action = "Check the free-tier quota in Google AI Studio, then retry after it resets."
+                else:
+                    action = (
+                        "Add API billing credits at platform.openai.com/settings/organization/billing, "
+                        "then retry the analysis."
+                    )
                 raise LLMError(
                     f"{provider_name} API quota is unavailable. {action}"
                 ) from exc
@@ -109,6 +140,16 @@ def _extract_output_text(payload: dict) -> str:
         for content in item.get("content", []):
             if content.get("type") == "output_text":
                 chunks.append(content.get("text", ""))
+    return "".join(chunks)
+
+
+def _extract_gemini_text(payload: dict) -> str:
+    chunks: list[str] = []
+    for candidate in payload.get("candidates", []):
+        for part in candidate.get("content", {}).get("parts", []):
+            text = part.get("text")
+            if text:
+                chunks.append(text)
     return "".join(chunks)
 
 

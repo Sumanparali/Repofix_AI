@@ -1,8 +1,8 @@
 # Render demo deployment
 
-This Blueprint deploys RepoFix as an analysis-only demo with one Free web service and one Free
-PostgreSQL database. The web service uses the in-process queue, so Redis and a separate worker are
-not required.
+This Blueprint deploys RepoFix with local analysis and Gemini patch generation using one Free web
+service and one Free PostgreSQL database. The web service uses the in-process queue, so Redis and a
+separate worker are not required. Automatic repair remains disabled.
 
 ## Required Blueprint values
 
@@ -12,6 +12,7 @@ Render prompts for these Firebase client configuration values during Blueprint c
 - `FIREBASE_AUTH_DOMAIN`
 - `FIREBASE_PROJECT_ID`
 - `FIREBASE_APP_ID`
+- `GEMINI_API_KEY`
 
 Copy their values from the local `.env` file. Do not commit `.env`.
 

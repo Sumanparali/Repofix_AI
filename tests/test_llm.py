@@ -5,7 +5,7 @@ import urllib.request
 
 import pytest
 
-from repofix.llm import LLMError, _send_request, generate_patch
+from repofix.llm import LLMError, _extract_gemini_text, _send_request, generate_patch
 from repofix.models import ProjectProfile
 
 
@@ -23,5 +23,41 @@ def test_quota_error_has_actionable_billing_message(monkeypatch) -> None:
 
     with pytest.raises(LLMError, match="Add API billing credits"):
         _send_request(urllib.request.Request("https://api.openai.com/v1/responses"))
+
+
+def test_gemini_patch_generation_uses_server_side_key(monkeypatch) -> None:
+    captured = {}
+
+    class Response:
+        def __enter__(self):
+            return io.BytesIO(json.dumps({
+                "candidates": [{"content": {"parts": [{"text": "```diff\n--- a/app.py\n+++ b/app.py\n```"}]}}]
+            }).encode())
+
+        def __exit__(self, *args):
+            return False
+
+    def respond(request, timeout):
+        captured["request"] = request
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setenv("REPOFIX_AI_PROVIDER", "gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-secret")
+    monkeypatch.setattr(urllib.request, "urlopen", respond)
+    profile = ProjectProfile("python", None, None, ())
+
+    patch = generate_patch("fix the broken value", profile, "app.py", "gemini-3.8-flash")
+
+    request = captured["request"]
+    assert request.full_url.endswith("/gemini-3.8-flash:generateContent")
+    assert request.get_header("X-goog-api-key") == "test-secret"
+    assert "test-secret" not in request.full_url
+    assert patch == "--- a/app.py\n+++ b/app.py"
+
+
+def test_extract_gemini_text_combines_response_parts() -> None:
+    payload = {"candidates": [{"content": {"parts": [{"text": "one"}, {"text": "two"}]}}]}
+    assert _extract_gemini_text(payload) == "onetwo"
 
 
