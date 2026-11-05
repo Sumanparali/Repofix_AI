@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "repofix-ai"
+version = "0.1.0"
+description = "Repository-aware AI software repair prototype"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "RepoFix AI contributors" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+web = ["fastapi>=0.115", "uvicorn>=0.30", "reportlab>=4.2", "sqlalchemy>=2.0,<2.1", "psycopg[binary]>=3.2", "firebase-admin>=6.0"]
+worker = ["redis>=5.0", "rq>=2.0"]
+
+[project.scripts]
+repofix = "repofix.cli:main"
+repofix-web = "repofix.web:main"
+repofix-benchmark = "repofix.benchmark:main"
+repofix-worker = "repofix.worker:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/repofix"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

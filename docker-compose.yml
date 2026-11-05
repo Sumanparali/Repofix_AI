@@ -1,0 +1,94 @@
+services:
+  database:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-repofix}
+      POSTGRES_USER: ${POSTGRES_USER:-repofix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-repofix-local-only}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-repofix} -d ${POSTGRES_DB:-repofix}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    command: ["repofix-web"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      REPOFIX_QUEUE_MODE: redis
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-repofix}:${POSTGRES_PASSWORD:-repofix-local-only}@database:5432/${POSTGRES_DB:-repofix}
+      REPOFIX_AUTH_MODE: ${REPOFIX_AUTH_MODE:?Set REPOFIX_AUTH_MODE in .env}
+      REPOFIX_ANALYSIS_ONLY: ${REPOFIX_ANALYSIS_ONLY:-1}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:?Set FIREBASE_PROJECT_ID in .env}
+      FIREBASE_API_KEY: ${FIREBASE_API_KEY:?Set FIREBASE_API_KEY in .env}
+      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN:?Set FIREBASE_AUTH_DOMAIN in .env}
+      FIREBASE_APP_ID: ${FIREBASE_APP_ID:?Set FIREBASE_APP_ID in .env}
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/firebase-admin.json
+      REPOFIX_WORKSPACE: /work
+    ports:
+      - "8000:8000"
+    volumes:
+      - repofix-data:/data
+      - repofix-work:/work
+      - ./secrets/firebase-admin.json:/run/secrets/firebase-admin.json:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: ["repofix-worker"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      REPOFIX_QUEUE_MODE: redis
+      REPOFIX_ANALYSIS_ONLY: ${REPOFIX_ANALYSIS_ONLY:-1}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-repofix}:${POSTGRES_PASSWORD:-repofix-local-only}@database:5432/${POSTGRES_DB:-repofix}
+      REPOFIX_WORKSPACE: /work
+      REPOFIX_ATTEMPTS: ${REPOFIX_ATTEMPTS:-3}
+      REPOFIX_WEB_RUNNER: ${REPOFIX_WEB_RUNNER:-docker}
+    volumes:
+      - repofix-data:/data
+      - repofix-work:/work
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    depends_on:
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres-data:
+  redis-data:
+  repofix-data:
+  repofix-work:
