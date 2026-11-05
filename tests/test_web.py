@@ -55,6 +55,13 @@ def test_sign_in_is_required_before_full_workspace() -> None:
     assert "'/demo'" not in app_js
 
 
+def test_authentication_startup_has_visible_fallback_and_timeout() -> None:
+    index_html = Path("src/repofix/static/index.html").read_text(encoding="utf-8")
+    app_js = Path("src/repofix/static/app.js").read_text(encoding="utf-8")
+    assert 'html.auth-pending:before{content:"RepoFix AI"' in index_html
+    assert "Promise.race([setup,timeout])" in app_js
+
+
 def test_demo_route_is_not_exposed(tmp_path: Path) -> None:
     app = create_app(tmp_path / "jobs.db", enqueue=lambda *args: "queued")
     route = next(route for route in app.routes if getattr(route, "path", None) == "/{page:path}")
