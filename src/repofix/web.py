@@ -97,7 +97,7 @@ def create_app(database: str | Path = Path("repofix.db"), enqueue=enqueue_analys
         return HTMLResponse(
             """<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>Signing out — RepoFix AI</title></head><body style=\"margin:0;min-height:100vh;display:grid;place-items:center;color:#eaf0f7;background:#07111f;font-family:system-ui\"><p>Signing you out…</p><script src=\"https://www.gstatic.com/firebasejs/11.3.1/firebase-app-compat.js\"></script><script src=\"https://www.gstatic.com/firebasejs/11.3.1/firebase-auth-compat.js\"></script><script>const config="""
             + config
-            + """;sessionStorage.removeItem('repofix_signed_in');sessionStorage.removeItem('repofix_welcome_pending');try{firebase.initializeApp(config);const auth=firebase.auth();auth.setPersistence(firebase.auth.Auth.Persistence.NONE).then(()=>auth.signOut()).catch(()=>auth.signOut()).finally(()=>location.replace('/login?logged_out=1'));}catch(error){location.replace('/login?logged_out=1');}</script></body></html>""",
+            + """;sessionStorage.removeItem('repofix_signed_in');sessionStorage.removeItem('repofix_welcome_pending');try{firebase.initializeApp(config);const auth=firebase.auth();auth.setPersistence(firebase.auth.Auth.Persistence.NONE).then(()=>auth.signOut()).catch(()=>auth.signOut()).finally(()=>location.replace('/?logged_out=1'));}catch(error){location.replace('/?logged_out=1');}</script></body></html>""",
             headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"},
         )
 

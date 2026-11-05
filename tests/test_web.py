@@ -62,6 +62,15 @@ def test_authentication_startup_has_visible_fallback_and_timeout() -> None:
     assert "Promise.race([setup,timeout])" in app_js
 
 
+def test_logout_returns_to_public_home_page(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "jobs.db", enqueue=lambda *args: "queued")
+    route = next(route for route in app.routes if getattr(route, "path", None) == "/logout")
+    response = route.endpoint()
+    app_js = Path("src/repofix/static/app.js").read_text(encoding="utf-8")
+    assert "location.replace('/?logged_out=1')" in response.body.decode()
+    assert "history.replaceState({page:'/'},'','/')" in app_js
+
+
 def test_demo_route_is_not_exposed(tmp_path: Path) -> None:
     app = create_app(tmp_path / "jobs.db", enqueue=lambda *args: "queued")
     route = next(route for route in app.routes if getattr(route, "path", None) == "/{page:path}")
