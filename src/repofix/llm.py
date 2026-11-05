@@ -94,7 +94,8 @@ Return only a valid git unified diff, with no Markdown fence or explanation.
 
 
 def _send_request(request: urllib.request.Request, provider_name: str = "OpenAI") -> dict:
-    for attempt in range(3):
+    max_attempts = 5
+    for attempt in range(max_attempts):
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
                 return json.load(response)
@@ -102,7 +103,7 @@ def _send_request(request: urllib.request.Request, provider_name: str = "OpenAI"
             error = _http_error_details(exc)
             code = str(error.get("code") or "")
             message = str(error.get("message") or exc.reason)
-            if exc.code == 429 and code != "insufficient_quota" and attempt < 2:
+            if exc.code in {429, 503} and code != "insufficient_quota" and attempt < max_attempts - 1:
                 time.sleep(2 ** (attempt + 1))
                 continue
             if exc.code == 429 and code == "insufficient_quota":
@@ -118,7 +119,12 @@ def _send_request(request: urllib.request.Request, provider_name: str = "OpenAI"
                 ) from exc
             if exc.code == 429:
                 raise LLMError(
-                    f"{provider_name} rate limit remained active after 3 attempts: {message}"
+                    f"{provider_name} rate limit remained active after {max_attempts} attempts: {message}"
+                ) from exc
+            if exc.code == 503:
+                raise LLMError(
+                    f"{provider_name} remained temporarily unavailable after {max_attempts} attempts: "
+                    f"{message}"
                 ) from exc
             raise LLMError(f"{provider_name} API request failed ({exc.code}): {message}") from exc
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:

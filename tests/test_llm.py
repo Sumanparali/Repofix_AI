@@ -47,10 +47,10 @@ def test_gemini_patch_generation_uses_server_side_key(monkeypatch) -> None:
     monkeypatch.setattr(urllib.request, "urlopen", respond)
     profile = ProjectProfile("python", None, None, ())
 
-    patch = generate_patch("fix the broken value", profile, "app.py", "gemini-3.8-flash")
+    patch = generate_patch("fix the broken value", profile, "app.py", "gemini-3.5-flash-lite")
 
     request = captured["request"]
-    assert request.full_url.endswith("/gemini-3.8-flash:generateContent")
+    assert request.full_url.endswith("/gemini-3.5-flash-lite:generateContent")
     assert request.get_header("X-goog-api-key") == "test-secret"
     assert "test-secret" not in request.full_url
     assert patch == "--- a/app.py\n+++ b/app.py"
@@ -59,5 +59,32 @@ def test_gemini_patch_generation_uses_server_side_key(monkeypatch) -> None:
 def test_extract_gemini_text_combines_response_parts() -> None:
     payload = {"candidates": [{"content": {"parts": [{"text": "one"}, {"text": "two"}]}}]}
     assert _extract_gemini_text(payload) == "onetwo"
+
+
+def test_temporary_gemini_unavailability_is_retried(monkeypatch) -> None:
+    attempts = 0
+    body = json.dumps({"error": {"message": "High demand"}}).encode()
+
+    class Response:
+        def __enter__(self):
+            return io.BytesIO(b'{"ok": true}')
+
+        def __exit__(self, *args):
+            return False
+
+    def respond(*args, **kwargs):
+        nonlocal attempts
+        attempts += 1
+        if attempts < 3:
+            raise urllib.error.HTTPError(
+                "https://generativelanguage.googleapis.com", 503, "Unavailable", {}, io.BytesIO(body)
+            )
+        return Response()
+
+    monkeypatch.setattr(urllib.request, "urlopen", respond)
+    monkeypatch.setattr("repofix.llm.time.sleep", lambda _: None)
+
+    assert _send_request(urllib.request.Request("https://example.com"), "Gemini") == {"ok": True}
+    assert attempts == 3
 
 

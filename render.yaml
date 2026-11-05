@@ -27,7 +27,7 @@ services:
       - key: REPOFIX_AI_PROVIDER
         value: gemini
       - key: REPOFIX_MODEL
-        value: gemini-3.8-flash
+        value: gemini-3.5-flash-lite
       - key: REPOFIX_ALLOW_REPAIR
         value: "0"
       - key: GEMINI_API_KEY

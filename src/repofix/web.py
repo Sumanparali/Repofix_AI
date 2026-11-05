@@ -41,7 +41,7 @@ def _default_model() -> str:
     if configured:
         return configured
     if os.getenv("REPOFIX_AI_PROVIDER", "openai").strip().lower() == "gemini":
-        return "gemini-3.8-flash"
+        return "gemini-3.5-flash-lite"
     return "gpt-6.1-terra"
 
 
