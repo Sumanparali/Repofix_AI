@@ -17,6 +17,8 @@ repofix-output/
 output/
 tmp/
 *.db
+*.db-shm
+*.db-wal
 *.sqlite*
 *.docx
 *.pdf

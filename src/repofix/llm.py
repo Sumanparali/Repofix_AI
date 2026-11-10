@@ -29,7 +29,7 @@ def generate_patch(
     feedback = ""
     if failure_feedback:
         feedback = f"""
-The previous repair attempt failed. Use this test feedback to improve the fix:
+The previous patch attempt failed validation. Use this feedback to correct the complete diff:
 {failure_feedback}
 """
     prompt = f"""You are repairing a {profile.language} repository.

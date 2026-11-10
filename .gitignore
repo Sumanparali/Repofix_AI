@@ -17,6 +17,8 @@ repofix-output/
 output/
 tmp/
 repofix.db
+*.db-shm
+*.db-wal
 benchmark-results.csv
 debug.log
 *.docx

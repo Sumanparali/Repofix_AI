@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 from contextvars import ContextVar
 
 _identity: ContextVar[dict] = ContextVar(
@@ -33,6 +34,9 @@ def verify_bearer(authorization: str | None) -> dict:
             firebase_admin.initialize_app()
         return auth.verify_id_token(authorization[7:], check_revoked=True)
     except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Firebase ID token verification failed (%s): %s", type(exc).__name__, exc
+        )
         raise ValueError("Invalid or expired authentication token") from exc
 
 

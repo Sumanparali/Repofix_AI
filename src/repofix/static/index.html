@@ -16,7 +16,7 @@
     @keyframes startup-spin{to{transform:rotate(360deg)}}
     @media(prefers-reduced-motion:reduce){html.auth-pending:after{animation:none;border-top-color:#f0b776}}
   </style>
-  <link rel="stylesheet" href="/static/styles.css?v=37">
+  <link rel="stylesheet" href="/static/styles.css?v=42">
   <script>document.documentElement.classList.add('auth-pending');if(location.pathname!=='/')document.documentElement.classList.add('route-loading')</script>
 </head>
 <body>
@@ -35,5 +35,5 @@
   </div>
   <div id="loginHost" hidden></div>
   <div id="app" class="app-shell" hidden><aside class="sidebar"><div class="sidebar-top"><a class="wordmark inverse" href="/dashboard" data-link><span class="mark">R</span><span>RepoFix <b>AI</b></span></a><button id="closeNav" class="icon-button mobile-only" aria-label="Close navigation">×</button></div><nav id="appNav"><small>WORKSPACE</small><a href="/dashboard" data-link data-page="dashboard"><span>⌂</span>Home</a><a href="/new-analysis" data-link data-page="new-analysis"><span>＋</span>New analysis</a><a href="/workspace" data-link data-page="workspace"><span>✦</span>AI workspace <em>1</em></a><small>REVIEW</small><a href="/review" data-link data-page="review"><span>◫</span>Code review</a><a href="/tests" data-link data-page="tests"><span>✓</span>Test results</a><a href="/history" data-link data-page="history"><span>↺</span>Job history</a><small>ACCOUNT</small><a href="/settings" data-link data-page="settings"><span>⚙</span>Settings</a></nav><div class="sidebar-status"><div><i id="sideHealth"></i><span><b>System operational</b><small id="queueHealth">Checking services…</small></span></div></div><div class="sidebar-user"><span class="avatar">AK</span><span><b>Alex Kim</b><small>Engineering workspace</small></span><button data-signout aria-label="Sign out">Sign out</button></div></aside><div class="app-main"><header class="app-header"><div><button id="openNav" class="icon-button mobile-only" aria-label="Open navigation">☰</button><span class="breadcrumb"><a href="/dashboard" data-link>Home</a> / <b id="crumb">Overview</b></span></div><div class="header-actions"><button class="icon-button" data-help aria-label="Open help">?</button><button class="icon-button notification" data-notifications aria-label="View notifications">♢<i></i></button><a class="button primary small" href="/new-analysis" data-link>＋ New analysis</a></div></header><main id="pageRoot" class="page-root"></main></div></div>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div><script src="https://www.gstatic.com/firebasejs/11.3.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/11.3.1/firebase-auth-compat.js"></script><script src="/static/app.js?v=37"></script>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div><script defer src="https://www.gstatic.com/firebasejs/11.3.1/firebase-app-compat.js"></script><script defer src="https://www.gstatic.com/firebasejs/11.3.1/firebase-auth-compat.js"></script><script defer src="/static/app.js?v=44"></script>
 </body></html>

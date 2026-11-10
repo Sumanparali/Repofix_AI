@@ -4,7 +4,7 @@ from pathlib import Path
 
 from .detector import detect_project
 from .llm import generate_patch
-from .patching import apply_patch
+from .patching import PatchError, apply_patch
 from .repair import repair_repository
 from .repository import acquire_repository
 from .retriever import build_context, retrieve_relevant_files
@@ -54,8 +54,22 @@ def analyze_job(
                     for index, path in enumerate(paths)
                 ]
         if mode == "generate":
-            patch = generate_patch(issue, profile, build_context(root, matches), model)
-            apply_patch(root, patch, check_only=True)
+            context = build_context(root, matches)
+            feedback = None
+            for attempt in range(2):
+                patch = generate_patch(
+                    issue, profile, context, model, failure_feedback=feedback
+                )
+                try:
+                    apply_patch(root, patch, check_only=True)
+                    break
+                except PatchError as exc:
+                    if attempt == 1:
+                        raise
+                    feedback = (
+                        "The previous unified diff failed validation with this error: "
+                        f"{exc}\nReturn a complete corrected unified diff only."
+                    )
             result.update({"patch": patch, "patch_valid": True})
         elif mode == "repair":
             if profile.test_command is None:
